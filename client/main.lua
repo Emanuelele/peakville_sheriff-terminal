@@ -25,12 +25,12 @@ RegisterNuiCallback("logout", function(data, cb)
     cb(true)
 end)
 
-RegisterNuiCallback("blackout", function(data, cb) --Mettere blackout
+RegisterNuiCallback("blackout", function(data, cb)
     TriggerServerEvent("Peakville:Blackout:SetTerminalBlackout", data.duration * 1000)
     cb({})
 end)
 
-RegisterNuiCallback("bank_open_shutters", function(data, cb) --Mettere banca
+RegisterNuiCallback("bank_open_shutters", function(data, cb)
     TriggerServerEvent("Peakville:Terminal:BankOpenShutters")
     cb({})
 end)
@@ -110,6 +110,17 @@ RegisterNuiCallback("insertCrime", function(data, cb)
     cb(result)
 end)
 
+RegisterNuiCallback("insertFine", function(data, cb)
+    local identifier = data.identifier
+    local amount = data.amount
+    local reason = data.reason
+    local firstname = data.firstname
+    local lastname = data.lastname
+
+    local result = ESX.AwaitServerCallback("Peakville:Terminal:InsertFine", identifier, amount, reason, firstname, lastname)
+    cb(result)
+end)
+
 RegisterNuiCallback("deleteNote", function(data, cb)
     local noteId = data.noteId
 
@@ -124,16 +135,13 @@ RegisterNuiCallback("deleteCrime", function(data, cb)
     cb({ success = success })
 end)
 
--- Helper function: Returns a vehicle entity matching the given plate
 function getVehicleByPlate(plate)
     local position = lib.callback.await("getvehicleposition", nil, plate)
-    print("Position for plate " .. plate .. ": ", json.encode(position))
     if position then return position end
     
     return nil
 end
 
--- Utility function to iterate over vehicles in the world
 function EnumerateVehicles()
     return coroutine.wrap(function()
         local handle, vehicle = FindFirstVehicle()

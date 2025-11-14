@@ -15,12 +15,6 @@ ESX.RegisterServerCallback("Peakville:Terminal:Login", function(source, cb, user
     cb(result)
 end)
 
---[[ RegisterNetEvent("Peakville:Terminal:LogOut", function()
-    local src = source
-    loggedIn[src] = nil
-end) ]]
-
-
 RegisterNetEvent("Peakville:Terminal:BankOpenShutters", function()
     if loggedIn[src] then
         TriggerClientEvent("Peakville:Bank:ForceOpenSecurityShutters", -1)
@@ -48,6 +42,7 @@ ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source,
         local users = MySQL.query.await("SELECT identifier, firstname, lastname, dateofbirth, sex, height, weight, ethnicity, state, shoe_size, blood_group, criminal_convictions FROM users")
         local crimeRecords = MySQL.query.await("SELECT id, identifier, record FROM crime_records")
         local citizenNotes = MySQL.query.await("SELECT id, identifier, note FROM citizen_notes")
+        local fines = MySQL.query.await("SELECT id, identifier, amount, reason, date FROM citizen_fines")
 
         local playersData = {}
 
@@ -66,6 +61,13 @@ ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source,
                 end
             end
 
+            local citizenFines = {}
+            for _, fine in pairs(fines) do
+                if fine.identifier == user.identifier then
+                    table.insert(citizenFines, { id = fine.id, amount = fine.amount, reason = fine.reason, date = fine.date })
+                end
+            end
+
             table.insert(playersData, {
                 identifier = user.identifier,
                 firstname = user.firstname,
@@ -80,7 +82,8 @@ ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source,
                 blood_group = user.blood_group,
                 criminal_convictions = user.criminal_convictions,
                 crimes = crimes,
-                notes = notes
+                notes = notes,
+                fines = citizenFines
             })
         end
 
@@ -143,6 +146,34 @@ ESX.RegisterServerCallback("Peakville:Terminal:DeleteCrime", function(source, cb
         end
     else
         cb(false)
+    end
+end)
+
+ESX.RegisterServerCallback("Peakville:Terminal:DeleteFine", function(source, cb, fineId)
+    local src = source
+    if loggedIn[src] == 2 then
+        local result = MySQL.query.await("DELETE FROM citizen_fines WHERE id = ?", {fineId})
+        if result then
+            cb(true)
+        else
+            cb(false)
+        end
+    else
+        cb(false)
+    end
+end)
+
+ESX.RegisterServerCallback("Peakville:Terminal:InsertFine", function(source, cb, identifier, amount, reason, firstname, lastname)
+    local src = source
+    if loggedIn[src] then
+        local insertedId = MySQL.insert.await("INSERT INTO citizen_fines (identifier, amount, reason, date) VALUES (?, ?, ?, NOW())", {identifier, amount, reason})
+        if insertedId then
+            cb({ success = true, id = insertedId })
+        else
+            cb({ success = false, error = "Errore nell'inserimento della multa" })
+        end
+    else
+        cb({ success = false, error = "Non autorizzato" })
     end
 end)
 

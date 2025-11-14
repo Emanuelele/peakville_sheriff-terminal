@@ -5,9 +5,6 @@ Config.Points = {
     vec3(-450.1400, 6015.2324, 32.2887),
     vec3(1959.6830, 5184.0635, 52.7718),
    vec3(-438.7941, 6011.7031, 27.5842),
-
-
-
 }
 
 Config.Model = "markz_prop_sheriff_terminal"
@@ -17,7 +14,7 @@ Config.Keys = {
     "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "RETURN", "DELETE",
             "A", "S", "D", "F", "G", "H", "j", "K", "L",
         "Z", "X", "C", "V", "B", "N", "M", "COMMA", "PERIOD", "SLASH",
-                            "SPACE", "LEFT", "RIGHT", "OEM_4", "OEM_5", "OEM_7", "SEMICOLON"
+                            "SPACE", "LEFT", "RIGHT", "UP", "DOWN", "OEM_4", "OEM_5", "OEM_7", "SEMICOLON"
 }
 
 Config.KeymappingToChar = {
@@ -34,6 +31,8 @@ Config.KeymappingToChar = {
     
     ["LEFT"] = "ArrowLeft",
     ["RIGHT"] = "ArrowRight",
+    ["UP"] = "ArrowUp",
+    ["DOWN"] = "ArrowDown",
     ["OEM_4"] = "è",
     ["OEM_5"] = "ù",
     ["OEM_7"] = "à",
@@ -42,7 +41,6 @@ Config.KeymappingToChar = {
 }
 
 Config.AllowedVehicles = {
-    --polgreenwoodfib policevbold3 policeb
     `polgreenwood`,
     `polgreenwoodfib`,
     `policevbold3`,
