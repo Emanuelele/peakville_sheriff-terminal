@@ -4,6 +4,12 @@ CDN = exports["peakville_cdn"]
 
 loggedIn = {}
 
+function unixToDateString(msTimestamp)
+    local timestamp = math.floor(msTimestamp / 1000)
+    local t = os.date("*t", timestamp)
+    return string.format("%02d/%02d/%04d", t.day, t.month, t.year)
+end
+
 ESX.RegisterServerCallback("Peakville:Terminal:Login", function(source, cb, username, password)
     local src = source
     local result = (username == "sheriff" and password == "amendment") and 1
@@ -40,9 +46,9 @@ ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source,
     local src = source
     if loggedIn[src] then
         local users = MySQL.query.await("SELECT identifier, firstname, lastname, dateofbirth, sex, height, weight, ethnicity, state, shoe_size, blood_group, criminal_convictions FROM users")
-        local crimeRecords = MySQL.query.await("SELECT id, identifier, record FROM crime_records")
-        local citizenNotes = MySQL.query.await("SELECT id, identifier, note FROM citizen_notes")
-        local fines = MySQL.query.await("SELECT id, identifier, amount, reason, date FROM citizen_fines")
+        local crimeRecords = MySQL.query.await("SELECT id, identifier, record, date FROM crime_records")
+        local citizenNotes = MySQL.query.await("SELECT id, identifier, note, date FROM citizen_notes")
+        local fines = MySQL.query.await("SELECT id, identifier, amount, reason, status, date FROM citizen_fines")
 
         local playersData = {}
 
@@ -50,21 +56,21 @@ ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source,
             local crimes = {}
             for _, crime in pairs(crimeRecords) do
                 if crime.identifier == user.identifier then
-                    table.insert(crimes, { id = crime.id, text = crime.record })
+                    table.insert(crimes, { id = crime.id, text = crime.record, date = unixToDateString(crime.date) })
                 end
             end
 
             local notes = {}
             for _, note in pairs(citizenNotes) do
                 if note.identifier == user.identifier then
-                    table.insert(notes, { id = note.id, text = note.note })
+                    table.insert(notes, { id = note.id, text = note.note, date = unixToDateString(note.date) })
                 end
             end
 
             local citizenFines = {}
             for _, fine in pairs(fines) do
                 if fine.identifier == user.identifier then
-                    table.insert(citizenFines, { id = fine.id, amount = fine.amount, reason = fine.reason, date = fine.date })
+                    table.insert(citizenFines, { id = fine.id, amount = fine.amount, reason = fine.reason, date = unixToDateString(fine.date), status = fine.status })
                 end
             end
 
@@ -96,11 +102,12 @@ end)
 ESX.RegisterServerCallback("Peakville:Terminal:InsertNote", function(source, cb, identifier, note)
     local src = source
     if loggedIn[src] then
-        local insertedId = MySQL.insert.await("INSERT INTO citizen_notes (identifier, note) VALUES (?, ?)", {identifier, note})
+        local insertedId = MySQL.insert.await("INSERT INTO citizen_notes (identifier, note, date) VALUES (?, ?, NOW())", {identifier, note})
         if insertedId then
-            cb({ success = true, id = insertedId })
+            local result = MySQL.query.await("SELECT date FROM citizen_notes WHERE id = ?", {insertedId})
+            cb({ success = true, id = insertedId, date = result[1].date })
         else
-            cb({ success = false, id = nil })
+            cb({ success = false, id = nil, date = nil })
         end
     else
         cb({})
@@ -124,14 +131,15 @@ end)
 ESX.RegisterServerCallback("Peakville:Terminal:InsertCrime", function(source, cb, identifier, record)
     local src = source
     if loggedIn[src] then
-        local insertedId = MySQL.insert.await("INSERT INTO crime_records (identifier, record) VALUES (?, ?)", {identifier, record})
+        local insertedId = MySQL.insert.await("INSERT INTO crime_records (identifier, record, date) VALUES (?, ?, NOW())", {identifier, record})
         if insertedId then
-            cb({ success = true, id = insertedId })
+            local result = MySQL.query.await("SELECT date FROM crime_records WHERE id = ?", {insertedId})
+            cb({ success = true, id = insertedId, date = result[1].date })
         else
-            cb({ success = false, id = nil })
+            cb({ success = false, id = nil, date = nil })
         end
     else
-        cb({ success = false, id = nil })
+        cb({ success = false, id = nil, date = nil })
     end
 end)
 
@@ -168,9 +176,24 @@ ESX.RegisterServerCallback("Peakville:Terminal:InsertFine", function(source, cb,
     if loggedIn[src] then
         local insertedId = MySQL.insert.await("INSERT INTO citizen_fines (identifier, amount, reason, date) VALUES (?, ?, ?, NOW())", {identifier, amount, reason})
         if insertedId then
-            cb({ success = true, id = insertedId })
+            local result = MySQL.query.await("SELECT date FROM citizen_fines WHERE id = ?", {insertedId})
+            cb({ success = true, id = insertedId, date = result[1].date })
         else
             cb({ success = false, error = "Errore nell'inserimento della multa" })
+        end
+    else
+        cb({ success = false, error = "Non autorizzato" })
+    end
+end)
+
+ESX.RegisterServerCallback("Peakville:Terminal:flagfinepayd", function(source, cb, fineId)
+    local src = source
+    if loggedIn[src] then
+        local result = MySQL.query.await("UPDATE citizen_fines SET status = 'Pagata' WHERE id = ?", {insertedId})
+        if result then
+            cb({ success = true })
+        else
+            cb({ success = false, error = "Errore nel sistema" })
         end
     else
         cb({ success = false, error = "Non autorizzato" })

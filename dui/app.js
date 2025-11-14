@@ -8,9 +8,7 @@ let ascii = `
  /$$  \ $$| $$  | $$| $$_____/| $$      | $$| $$      | $$      
 | $$$$$$/| $$  | $$|  $$$$$$$| $$      | $$| $$      | $$      
  \______/ |__/  |__/  \_______/|__/      |__/|__/      |__/                                                                 
-                                            
-
-> Digitare 'help' per l'elenco dei comandi.`
+`
 
 let NOT_LOGGED_PROMPT = `$ `
 let loggedIn = false
@@ -85,15 +83,12 @@ async function createProgressBar(step = 50) {
 }
 
 let commandsHelp = {
-    "findanklet" : "Localizza una cavigliera",
-    "findcar [targa]": "Localizza il veicolo tramite targa e lo evidenzia sulla mappa per 5 minuti.",
-    "citizencard": "Cerca e gestisci i dati dei cittadini (visualizza, aggiungi, elimina note/record).",
-    "fine": "Inserisci una multa per un cittadino (cerca cittadino e compila importo e motivazione).",
-    "switchpower [tempo]": "Attiva o disattiva l'alimentazione per un periodo specificato (1-120 secondi).",
-    "togglealarm": "Attiva l'allarme della stazione degli sceriffi (solo per admin).",
-    "login": "Autenticati inserendo username e password.",
-    "exit/quit": "Termina la sessione del terminale ed esegui il logout.",
-    "help": "Visualizza l'elenco dei comandi con una breve descrizione."
+    "1. help": "Visualizza l'elenco dei comandi con una breve descrizione.",
+    "2. login": "Autenticati inserendo username e password.",
+    "3. exit": "Termina la sessione del terminale ed esegui il logout.",
+    "4. citizencard": "Cerca e gestisci i dati dei cittadini (visualizza, aggiungi, elimina note/record/multe).",
+    "5. findanklet" : "Localizza una cavigliera",
+    "6. findcar [targa]": "Localizza il veicolo tramite targa e lo evidenzia sulla mappa per 5 minuti.",
 };
 
 let commands = {
@@ -249,9 +244,11 @@ let commands = {
                 term.echo("2. Visualizza record penali");
                 term.echo("3. Aggiungi nota");
                 term.echo("4. Aggiungi record penale");
+                term.echo("5. Visualizza multe");
+                term.echo("6. Aggiungi multa");
                 term.echo("0. Esci");
 
-                let menuChoice = await term.read("Inserisci un'opzione (0-4):");
+                let menuChoice = await term.read("Inserisci un'opzione (0-6):");
                 menuChoice = parseInt(menuChoice, 10);
 
                 switch (menuChoice) {
@@ -261,6 +258,7 @@ let commands = {
                         if (selectedCitizen.notes && selectedCitizen.notes.length > 0) {
                             selectedCitizen.notes.forEach(note => {
                                 term.echo(`[[b;yellow;]ID ${note.id}:] ${note.text}`);
+                                term.echo(`[[b;yellow;]Data:] ${note.date || "N/A"}`);
                                 term.echo("");
                             });
 
@@ -287,6 +285,7 @@ let commands = {
                         if (selectedCitizen.crimes && selectedCitizen.crimes.length > 0) {
                             selectedCitizen.crimes.forEach(crime => {
                                 term.echo(`[[b;yellow;]ID ${crime.id}:] ${crime.text}`);
+                                term.echo(`[[b;yellow;]Data:] ${crime.date || "N/A"}`);
                                 term.echo("");
                             });
 
@@ -313,7 +312,8 @@ let commands = {
                         if (note && note.trim() !== "") {
                             const newNote = {
                                 id: null,
-                                text: note
+                                text: note,
+                                date: null
                             };
                             let noteResp = await $.post(`https://peakville_sheriff-terminal/insertNote`, JSON.stringify({
                                 identifier: selectedCitizen.identifier,
@@ -321,6 +321,7 @@ let commands = {
                             }));
                             if (noteResp.success) {
                                 newNote.id = noteResp.id;
+                                newNote.date = noteResp.date;
                                 if (!selectedCitizen.notes) {
                                     selectedCitizen.notes = [];
                                 }
@@ -338,7 +339,8 @@ let commands = {
                         if (crime && crime.trim() !== "") {
                             const newCrime = {
                                 id: null,
-                                text: crime
+                                text: crime,
+                                date: null
                             };
                             let crimeResp = await $.post(`https://peakville_sheriff-terminal/insertCrime`, JSON.stringify({
                                 identifier: selectedCitizen.identifier,
@@ -346,6 +348,7 @@ let commands = {
                             }));
                             if (crimeResp.success) {
                                 newCrime.id = crimeResp.id;
+                                newCrime.date = crimeResp.date;
                                 if (!selectedCitizen.crimes) {
                                     selectedCitizen.crimes = [];
                                 }
@@ -356,6 +359,97 @@ let commands = {
                             }
                         }
                         break;
+                    
+                    case 5:
+                        term.clear();
+                        term.echo("[[gb;green;]Multe del cittadino:]");
+                        if (selectedCitizen.fines && selectedCitizen.fines.length > 0) {
+                            selectedCitizen.fines.forEach(fine => {
+                                term.echo(`[[b;yellow;]ID ${fine.id}:] $${fine.amount}`);
+                                term.echo(`[[b;yellow;]Motivo:] ${fine.reason}`);
+                                term.echo(`[[b;yellow;]Status:] ${fine.status || "N/A"}`);
+                                term.echo(`[[b;yellow;]Data:] ${fine.date || "N/A"}`);
+                                term.echo("");
+                            });
+                            let message = "Inserisci 0 per uscire, 1 per segnare una multa come pagata"
+                            if (loggedIn === 2) {
+                                message = message + ", 2 per eliminare la multa"
+                            }
+                            message = message + ": "
+                            let choiche = await term.read(message);
+                            choiche = parseInt(choiche, 10);
+                            switch (choiche) {
+                                case 1:
+                                    let updateFineId = await term.read("Inserisci l'ID della multa da segnare come pagata (0 per saltare):");
+                                    updateFineId = parseInt(updateFineId, 10);
+                                    if (updateFineId && updateFineId !== 0) {
+                                        selectedCitizen.fines.find(fine => fine.id === updateFineId).status = "Pagata";
+                                        await $.post(`https://peakville_sheriff-terminal/flagfinepayd`, JSON.stringify({
+                                            fineId: updateFineId
+                                        }));
+                                        term.echo("[[gb;green;]Multa modificata con successo.]");
+                                    }
+                                break;
+                                case 2:
+                                    if (loggedIn === 2) {
+                                        let deleteFineId = await term.read("Inserisci l'ID della multa da eliminare (0 per saltare):");
+                                        deleteFineId = parseInt(deleteFineId, 10);
+                                        if (deleteFineId && deleteFineId !== 0) {
+                                            selectedCitizen.fines = selectedCitizen.fines.filter(fine => fine.id !== deleteFineId);
+                                            await $.post(`https://peakville_sheriff-terminal/deleteFine`, JSON.stringify({
+                                                fineId: deleteFineId
+                                            }));
+                                            term.echo("[[gb;green;]Multa eliminata con successo.]");
+                                        }
+                                    }
+                                break;
+                            }
+                        }
+
+                    case 6:
+                        term.clear();
+                        let amount = await term.read("Inserisci l'importo della multa (0 per annullare):");
+                        amount = parseInt(amount, 10);
+
+                        if (amount === 0 || isNaN(amount)) {
+                            term.echo("Operazione annullata.");
+                            break;
+                        }
+
+                        let reason = await term.read("Inserisci la motivazione della multa:");
+                        reason = reason.trim();
+
+                        if (!reason) {
+                            term.error("Motivazione non valida.");
+                            break;
+                        }
+
+                        term.echo("[[gb;green;]Invio multa in corso...]");
+                        let fineResp = await $.post(`https://peakville_sheriff-terminal/insertFine`, JSON.stringify({
+                            identifier: selectedCitizen.identifier,
+                            amount: amount,
+                            reason: reason,
+                            firstname: selectedCitizen.firstname,
+                            lastname: selectedCitizen.lastname
+                        }));
+
+                        if (fineResp && fineResp.success) {
+                            const newFine = {
+                                id: fineResp.id,
+                                amount: amount,
+                                reason: reason,
+                                date: fineResp.date
+                            };
+                            if (!selectedCitizen.fines) {
+                                selectedCitizen.fines = [];
+                            }
+                            selectedCitizen.fines.push(newFine);
+                            term.echo(`[[gb;green;]Multa di $${amount} inserita con successo.]`);
+                        } else {
+                            term.error("Errore nell'inserimento della multa: " + (fineResp?.error || "Errore sconosciuto."));
+                        }
+                        break;
+
                     case 0:
                         menuActive = false;
                         break;
@@ -365,105 +459,6 @@ let commands = {
                         break;
                 }
             }
-        }
-    },
-
-    "fine": async function() {
-        if (!loggedIn) {
-            term.error("Devi effettuare il login per eseguire questo comando, esegui `login`");
-            return;
-        }
-
-        if (!playersData || playersData.length <= 0) {
-            term.error("Nessun dato disponibile. Assicurati di aver effettuato il login.");
-            return;
-        }
-
-        let searchValue = await term.read("Inserisci il valore da cercare (0 per uscire):");
-        searchValue = searchValue.trim();
-
-        if (searchValue === "0") {
-            term.echo("Operazione annullata.");
-            return;
-        }
-
-        searchValue = searchValue.toLowerCase();
-
-        if (!searchValue) {
-            term.error("Inserisci un valore valido per la ricerca.");
-            return;
-        }
-
-        let results = playersData.filter(player => {
-            return Object.entries(player).some(([key, value]) => {
-                if (value === null || value === undefined) return false;
-                if (Array.isArray(value)) return false;
-                if (typeof value === 'object') return false;
-                return String(value).toLowerCase().includes(searchValue);
-            });
-        });
-
-        if (results.length === 0) {
-            term.error(`Nessun risultato trovato per "${searchValue}"`);
-            return;
-        }
-
-        term.echo(`[[gb;green;]Trovati ${results.length} risultato/i:]`);
-        results.forEach((player, index) => {
-            term.echo(`[[b;yellow;]${index + 1}.] ${player.firstname} ${player.lastname}`);
-        });
-
-        let selectedIndex = await term.read("Inserisci il numero del cittadino per inserire la multa (0 per uscire):");
-        selectedIndex = parseInt(selectedIndex, 10);
-
-        if (selectedIndex === 0) {
-            term.echo("Operazione annullata.");
-            return;
-        }
-
-        selectedIndex = selectedIndex - 1;
-
-        if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= results.length) {
-            term.error("Selezione non valida. Inserisci un numero valido dalla lista.");
-            return;
-        }
-
-        const selectedCitizen = results[selectedIndex];
-        term.clear();
-        term.echo(`[[gb;green;]Inserimento multa per:]`);
-        term.echo(`[[b;yellow;]Nome:] ${selectedCitizen.firstname || "N/A"} ${selectedCitizen.lastname || "N/A"}`);
-        term.echo(`[[b;yellow;]Data di nascita:] ${selectedCitizen.date_of_birth || "N/A"}`);
-        term.echo("");
-
-        let amount = await term.read("Inserisci l'importo della multa (0 per annullare):");
-        amount = parseInt(amount, 10);
-
-        if (amount === 0 || isNaN(amount)) {
-            term.echo("Operazione annullata.");
-            return;
-        }
-
-        let reason = await term.read("Inserisci la motivazione della multa:");
-        reason = reason.trim();
-
-        if (!reason) {
-            term.error("Motivazione non valida.");
-            return;
-        }
-
-        term.echo("[[gb;green;]Invio multa in corso...]");
-        let response = await $.post(`https://peakville_sheriff-terminal/insertFine`, JSON.stringify({
-            identifier: selectedCitizen.identifier,
-            amount: amount,
-            reason: reason,
-            firstname: selectedCitizen.firstname,
-            lastname: selectedCitizen.lastname
-        }));
-
-        if (response && response.success) {
-            term.echo(`[[gb;green;]Multa di $${amount} inserita con successo per ${selectedCitizen.firstname} ${selectedCitizen.lastname}.]`);
-        } else {
-            term.error("Errore nell'inserimento della multa: " + (response?.error || "Errore sconosciuto."));
         }
     },
 
@@ -505,6 +500,7 @@ let commands = {
     },
 
     "help": function() {
+        term.echo("Lista dei comandi disponibile: \n\n")
         for (const [command, description] of Object.entries(commandsHelp)) {
             if (description.length > 60) {
                 let splittedDescription = description.match(/.{1,55}/g)
@@ -596,6 +592,12 @@ let commands = {
     },
 
     "quit": function() {commands.exit()},
+    "1": function() {commands.help()},
+    "2": function() {commands.login()},
+    "3": function() {commands.exit()},
+    "4": function() {commands.citizencard()},
+    "5": function() {commands.findanklet()},
+    "6": function() {commands.findcar()},
 }
 
 function getKeyCode(key) {
@@ -663,4 +665,6 @@ window.addEventListener("message", (e) => {
     }
 });
 
+term.echo("Autologin...\n")
 loadSavedLogin()
+if (!loggedIn) commands.help()

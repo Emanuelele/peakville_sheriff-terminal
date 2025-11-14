@@ -121,6 +121,7 @@ RegisterNuiCallback("insertFine", function(data, cb)
     cb(result)
 end)
 
+
 RegisterNuiCallback("deleteNote", function(data, cb)
     local noteId = data.noteId
 
@@ -133,6 +134,16 @@ RegisterNuiCallback("deleteCrime", function(data, cb)
 
     local success = ESX.AwaitServerCallback("Peakville:Terminal:DeleteCrime", crimeId)
     cb({ success = success })
+end)
+
+RegisterNuiCallback("deleteFine", function(data, cb)
+    local fineId = data.fineId
+    local success = ESX.AwaitServerCallback("Peakville:Terminal:DeleteFine"), fineId
+end)
+
+RegisterNuiCallback("flagfinepayd", function(data, cb)
+    local fineId = data.fineId
+    local success = ESX.AwaitServerCallback("Peakville:Terminal:flagfinepayd"), fineId
 end)
 
 function getVehicleByPlate(plate)
