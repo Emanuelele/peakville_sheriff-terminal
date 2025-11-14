@@ -12,18 +12,6 @@ let ascii = `
 
 > Digitare 'help' per l'elenco dei comandi.`
 
-const searchFieldMapping = {
-    nome: "firstname",
-    cognome: "lastname",
-    data_nascita: "date_of_birth",
-    sesso: "gender",
-    altezza: "height",
-    stato: "state",
-    etnia: "ethnicity",
-    scarpe: "shoes",
-    sangue: "blood_type",
-};
-
 let NOT_LOGGED_PROMPT = `$ `
 let loggedIn = false
 
@@ -32,6 +20,17 @@ let greetings = "[[g;#00ff00;]Eden Data System Terminal [Version 0.0.14979.4192]
 let username = undefined;
 let password = undefined;
 let playersData = undefined;
+
+async function loadSavedLogin() {
+    const savedUsername = localStorage.getItem('terminal_username');
+    const savedPassword = localStorage.getItem('terminal_password');
+    commands.login2(savedUsername, savedPassword)
+}
+
+function saveLogin(user, password) {
+    localStorage.setItem('terminal_username', user);
+    localStorage.setItem('terminal_password', password);
+}
 
 async function AskLuaIfItsCorrect(username, password) {
     let data = await $.post(`https://peakville_sheriff-terminal/login`, JSON.stringify({
@@ -83,9 +82,7 @@ let commandsHelp = {
     "findanklet" : "Localizza una cavigliera",
     "findcar [plate]": "Localizza il veicolo tramite targa e lo evidenzia sulla mappa per 5 minuti.",
     "citizencard": "Cerca e gestisci i dati dei cittadini (visualizza, aggiungi, elimina note/record).",
-    "searchfields": "Mostra la lista dei campi di ricerca disponibili.",
     "switchpower [time]": "Attiva o disattiva l'alimentazione per un periodo specificato (1-120 secondi).",
-    //"bos": "Apri a distanza le serrande di sicurezza della banca.",
     "togglealarm": "Attiva l'allarme della stazione degli sceriffi (solo per admin).",
     "login": "Autenticati inserendo username e password.",
     "exit/quit": "Termina la sessione del terminale ed esegui il logout.",
@@ -130,12 +127,10 @@ let commands = {
             return;
         }
         
-        // Recupera l'id associato all'indice selezionato (attenzione: indice inizia da 1)
         let selectedId = ankletEntries[choice - 1][0];
         let name = ankletEntries[choice - 1][1];
         term.echo(`[[gb;green;]Localizzazione della cavigliera: ${selectedId}]`);
         
-        // Chiama il callback lato Lua per eseguire la localizzazione
         let response = await $.post(`https://peakville_sheriff-terminal/localizePlayer`, JSON.stringify({
             ankletId: selectedId,
             name: name
@@ -178,54 +173,52 @@ let commands = {
             return;
         }
 
-        let searchFieldInput = await term.read("Ricerca per campo (usa keyword, es. 'nome', 'cognome', ecc.):");
-        searchFieldInput = searchFieldInput.trim().toLowerCase();
+        let searchValue = await term.read("Inserisci il valore da cercare:");
+        searchValue = searchValue.trim().toLowerCase();
 
-        if (!searchFieldMapping.hasOwnProperty(searchFieldInput)) {
-            term.error("Campo di ricerca non valido. Usa il comando 'searchfields' per vedere i campi disponibili.");
+        if (!searchValue) {
+            term.error("Inserisci un valore valido per la ricerca.");
             return;
         }
 
-        let actualField = searchFieldMapping[searchFieldInput];
-        let searchValue = await term.read(`Inserisci il valore per '${searchFieldInput}':`);
-
         let results = playersData.filter(player => {
-            if (player[actualField] !== undefined) {
-                return String(player[actualField]).toLowerCase().includes(searchValue.toLowerCase());
-            }
-            return false;
+            return Object.entries(player).some(([key, value]) => {
+                if (value === null || value === undefined) return false;
+                if (Array.isArray(value)) return false;
+                if (typeof value === 'object') return false;
+                return String(value).toLowerCase().includes(searchValue);
+            });
         });
 
-
         if (results.length === 0) {
-            term.error(`No results found for "${searchField}" with value "${searchValue}"`);
+            term.error(`Nessun risultato trovato per "${searchValue}"`);
         } else {
-            term.echo(`[[gb;green;]Found ${results.length} result(s):]`);
+            term.echo(`[[gb;green;]Trovati ${results.length} risultato/i:]`);
             results.forEach((player, index) => {
                 term.echo(`[[b;yellow;]${index + 1}.] ${player.firstname} ${player.lastname}`);
             });
 
-            let selectedIndex = await term.read("Enter the number of the citizen to view details:");
+            let selectedIndex = await term.read("Inserisci il numero del cittadino per visualizzare i dettagli:");
             selectedIndex = parseInt(selectedIndex, 10) - 1;
 
             if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= results.length) {
-                term.error("Invalid selection. Please enter a valid number from the list.");
+                term.error("Selezione non valida. Inserisci un numero valido dalla lista.");
                 return;
             }
 
             const selectedCitizen = results[selectedIndex];
             term.clear();
-            term.echo(`[[gb;green;]Citizen Details:]`);
+            term.echo(`[[gb;green;]Dettagli Cittadino:]`);
             term.echo(`[[b;yellow;]Name:] ${selectedCitizen.firstname || "N/A"} ${selectedCitizen.lastname || "N/A"}`);
             term.echo(`[[b;yellow;]Date of Birth:] ${selectedCitizen.date_of_birth || "N/A"}`);
             term.echo(`[[b;yellow;]Gender:] ${selectedCitizen.gender || "N/A"}`);
             term.echo(`[[b;yellow;]Height:] ${selectedCitizen.height || "N/A"}`);
-            term.echo(`[[b;yellow;]Married:] ${selectedCitizen.social_status || "N/A"}`);
+            term.echo(`[[b;yellow;]Weight:] ${selectedCitizen.weight || "N/A"}`);
             term.echo(`[[b;yellow;]State:] ${selectedCitizen.state || "N/A"}`);
             term.echo(`[[b;yellow;]Ethnicity:] ${selectedCitizen.ethnicity || "N/A"}`);
-            term.echo(`[[b;yellow;]Shoes Size:] ${selectedCitizen.shoes || "N/A"}`);
-            term.echo(`[[b;yellow;]Blood Type:] ${selectedCitizen.blood_type || "N/A"}`);
-            term.echo(`[[b;yellow;]Criminal Records Description:] ${selectedCitizen.criminal_records_description || "N/A"}`);
+            term.echo(`[[b;yellow;]Shoe Size:] ${selectedCitizen.shoe_size || "N/A"}`);
+            term.echo(`[[b;yellow;]Blood Group:] ${selectedCitizen.blood_group || "N/A"}`);
+            term.echo(`[[b;yellow;]Criminal Convictions:] ${selectedCitizen.criminal_convictions || "N/A"}`);
             term.echo("");
 
             let menuActive = true;
@@ -350,13 +343,6 @@ let commands = {
         }
     },
 
-    "searchfields": function() {
-        term.echo("[[gb;green;]Search field Available [keyword]");
-        for (let key in searchFieldMapping) {
-            term.echo(`- ${key}`);
-        }
-    },
-
     "switchpower": async function(time) {
         if (!loggedIn) {term.error("You must be logged in to execute that command, run `login`"); return}
         time = parseInt(time)
@@ -393,38 +379,6 @@ let commands = {
         }))
         term.resume()
     },
-
-    /* "bos": async function() {
-        if (!loggedIn) {term.error("You must be logged in to execute that command, run `login`"); return}
-
-        let prompt = term.get_prompt()
-        term.pause(true)
-        term.echo("[[gb;green;]Downloading hosts.txt from ARPANET (NIC)]")
-        await createProgressBar()
-        term.echo("[[gb;green;]Estabilishing NCP connections]")
-        await createProgressBar(60)
-        term.echo("[[gb;green;]Sending raw packets to bank_central_PK0x001]")
-        await createProgressBar()
-        
-        term.echo("[[gb;green;]Response from bank_central_PK0x001:]")
-        term.echo("[[gb;green;]"+JSON.stringify({
-            ack: Math.floor(randomRange(-100000, 1000000)), 
-            pipelineId: "0x"+Math.floor(randomRange(10000, 16777215)).toString(16), 
-            remote: true, 
-            executionStack: "0x"+Math.floor(randomRange(10000, 16777215)).toString(16) + " => " + "0x"+Math.floor(randomRange(10000, 16777215)).toString(16) + " => "+"0x"+Math.floor(randomRange(10000, 16777215)).toString(16),
-            executionFlags: "(0x001 << 5) | (0x001 << 10) | (0x001 << 0x34d)",
-            async: true,
-            machineId: "0x"+Math.floor(randomRange(10000, 16777215)).toString(16)
-        })+"]")
-
-        term.set_prompt(prompt)
-        term.echo("[[gb;green;]Processing...]")
-        await createProgressBar(100)
-        term.echo("[[gb;green;]Security shutters opened successfully]")
-
-        $.post(`https://peakville_sheriff-terminal/bank_open_shutters`, JSON.stringify({}))
-        term.resume()  
-    }, */
 
     "help": function() {
         for (const [command, description] of Object.entries(commandsHelp)) {
@@ -465,6 +419,30 @@ let commands = {
             term.echo(greetings)
             term.echo(`Welcome ${username}!`)
             loggedIn = res;
+            saveLogin(username, password);
+        } else {
+            term.error("Incorrect username or password!")
+            loggedIn = false;
+            term.set_prompt(NOT_LOGGED_PROMPT)
+        }
+    },
+
+    "login2": async function(username, password) {
+        username = username
+        password = password
+        term.set_prompt("")
+        const res = await AskLuaIfItsCorrect(username, password)
+        if (res != 0) {
+            playersData = await $.get(`https://peakville_sheriff-terminal/getPlayersData`)
+            term.set_prompt(`[[g;red;]peakville@${username}]:[[;#8080ff;]~]$ `)
+            term.clear()
+            var cmd = term.cmd();
+            var keymap = cmd.keymap();
+            delete keymap['CTRL+R'];
+            term.echo(greetings)
+            term.echo(`Welcome ${username}!`)
+            loggedIn = res;
+            saveLogin(username, password);
         } else {
             term.error("Incorrect username or password!")
             loggedIn = false;
@@ -478,7 +456,6 @@ let commands = {
         var keymap = cmd.keymap();
         delete keymap['CTRL+R'];
         term.echo(greetings)
-        loggedIn = false;
         term.set_prompt(NOT_LOGGED_PROMPT)
         $.post(`https://peakville_sheriff-terminal/exit`, JSON.stringify({}))
     },
@@ -554,3 +531,5 @@ window.addEventListener("message", (e) => {
         }
     }
 });
+
+loadSavedLogin()

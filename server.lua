@@ -15,10 +15,10 @@ ESX.RegisterServerCallback("Peakville:Terminal:Login", function(source, cb, user
     cb(result)
 end)
 
-RegisterNetEvent("Peakville:Terminal:LogOut", function()
+--[[ RegisterNetEvent("Peakville:Terminal:LogOut", function()
     local src = source
     loggedIn[src] = nil
-end)
+end) ]]
 
 
 RegisterNetEvent("Peakville:Terminal:BankOpenShutters", function()
@@ -45,22 +45,13 @@ end)
 ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source, cb)
     local src = source
     if loggedIn[src] then
-        local users = MySQL.query.await("SELECT identifier, firstname, lastname, dateofbirth, sex, height FROM users")
-        local extraInfo = MySQL.query.await("SELECT identifier, stato, etnia, scarpe, sangue, descrizione_condanne_penali, stato_sociale FROM user_extra_info")
+        local users = MySQL.query.await("SELECT identifier, firstname, lastname, dateofbirth, sex, height, weight, ethnicity, state, shoe_size, blood_group, criminal_convictions FROM users")
         local crimeRecords = MySQL.query.await("SELECT id, identifier, record FROM crime_records")
         local citizenNotes = MySQL.query.await("SELECT id, identifier, note FROM citizen_notes")
 
         local playersData = {}
 
         for _, user in pairs(users) do
-            local extra = {}
-            for _, info in pairs(extraInfo) do
-                if info.identifier == user.identifier then
-                    extra = info
-                    break
-                end
-            end
-
             local crimes = {}
             for _, crime in pairs(crimeRecords) do
                 if crime.identifier == user.identifier then
@@ -82,12 +73,12 @@ ESX.RegisterServerCallback("Peakville:Terminal:GetPlayersData", function(source,
                 date_of_birth = user.dateofbirth,
                 gender = user.sex,
                 height = user.height,
-                social_status = extra.stato_sociale,
-                state = extra.stato or "N/A",
-                ethnicity = extra.etnia or "N/A",
-                shoes = extra.scarpe or "N/A",
-                blood_type = extra.sangue or "N/A",
-                criminal_records_description = extra.descrizione_condanne_penali or "N/A",
+                weight = user.weight,
+                ethnicity = user.ethnicity,
+                state = user.state,
+                shoe_size = user.shoe_size,
+                blood_group = user.blood_group,
+                criminal_convictions = user.criminal_convictions,
                 crimes = crimes,
                 notes = notes
             })
